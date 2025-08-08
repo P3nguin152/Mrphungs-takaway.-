@@ -1,8 +1,15 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { formatDistanceToNow, isValid } from 'date-fns';
+import Link from 'next/link';
+import {
+  formatDistanceToNow,
+  format,
+  startOfDay,
+  subDays,
+  isAfter,
+} from 'date-fns';
 
 interface OrderItem {
   id: string;
@@ -31,6 +38,8 @@ export default function AdminDashboard() {
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('7d');
+  const [statusFilter, setStatusFilter] = useState<'all' | Order['status']>('all');
   const router = useRouter();
 
   // In a real app, use proper authentication
@@ -109,6 +118,113 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helpers
+  const normalizeDate = (d?: string) => {
+    if (!d) return null;
+    const date = new Date(d);
+    return isNaN(date.getTime()) ? null : date;
+  };
+
+  const rangeStart = useMemo(() => {
+    const now = new Date();
+    switch (dateRange) {
+      case 'today':
+        return startOfDay(now);
+      case '7d':
+        return startOfDay(subDays(now, 6)); // include today = 7 points
+      case '30d':
+        return startOfDay(subDays(now, 29));
+      case 'all':
+      default:
+        return null;
+    }
+  }, [dateRange]);
+
+  const filtered = useMemo(() => {
+    return orders.filter((o) => {
+      const created = normalizeDate(o.createdAt) ?? normalizeDate(o.updatedAt);
+      const inRange = !rangeStart || (created && isAfter(created, subDays(rangeStart, 1)));
+      const statusOk = statusFilter === 'all' || o.status === statusFilter;
+      return inRange && statusOk;
+    });
+  }, [orders, rangeStart, statusFilter]);
+
+  // Metrics
+  const metrics = useMemo(() => {
+    const totalOrders = filtered.length;
+    const totalRevenue = filtered.reduce((sum, o) => sum + (o.total || 0), 0);
+    const completed = filtered.filter((o) => o.status === 'completed');
+    const completedRevenue = completed.reduce((sum, o) => sum + (o.total || 0), 0);
+    const avgOrderValue = totalOrders ? totalRevenue / totalOrders : 0;
+    const counts = {
+      pending: filtered.filter(o => o.status === 'pending').length,
+      accepted: filtered.filter(o => o.status === 'accepted').length,
+      preparing: filtered.filter(o => o.status === 'preparing').length,
+      ready: filtered.filter(o => o.status === 'ready').length,
+      completed: filtered.filter(o => o.status === 'completed').length,
+      cancelled: filtered.filter(o => o.status === 'cancelled').length,
+    } as Record<Order['status'], number>;
+
+    // Revenue by day (for chart)
+    const byDay = new Map<string, number>();
+    const now = new Date();
+    const days = dateRange === 'today' ? 1 : dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 30;
+    const start = rangeStart ?? startOfDay(subDays(now, days - 1));
+    for (let i = 0; i < days; i++) {
+      const day = startOfDay(subDays(now, days - 1 - i));
+      const key = format(day, 'yyyy-MM-dd');
+      byDay.set(key, 0);
+    }
+    filtered.forEach((o) => {
+      const created = normalizeDate(o.createdAt) ?? normalizeDate(o.updatedAt);
+      if (!created) return;
+      const key = format(startOfDay(created), 'yyyy-MM-dd');
+      if (byDay.has(key)) byDay.set(key, (byDay.get(key) || 0) + (o.total || 0));
+    });
+    const revenueSeries = Array.from(byDay.entries()).map(([date, value]) => ({ date, value }));
+
+    // Top items
+    const itemTotals = new Map<string, { name: string; revenue: number; qty: number }>();
+    filtered.forEach((o) => {
+      o.items?.forEach((it) => {
+        const prev = itemTotals.get(it.id) || { name: it.name, revenue: 0, qty: 0 };
+        prev.revenue += (it.price || 0) * (it.quantity || 0);
+        prev.qty += it.quantity || 0;
+        itemTotals.set(it.id, prev);
+      });
+    });
+    const topItems = Array.from(itemTotals.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    return { totalOrders, totalRevenue, completedRevenue, avgOrderValue, counts, revenueSeries, topItems };
+  }, [filtered, dateRange, rangeStart]);
+
+  // Chart hover state
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  const exportCSV = () => {
+    const header = ['OrderID','Customer','Phone','Address','Status','Total','CreatedAt','UpdatedAt'];
+    const rows = filtered.map(o => [
+      o._id,
+      JSON.stringify(o.customerName || ''),
+      JSON.stringify(o.phone || ''),
+      JSON.stringify(o.deliveryAddress || ''),
+      o.status,
+      o.total?.toFixed(2) ?? '0.00',
+      o.createdAt,
+      o.updatedAt,
+    ]);
+    const csv = [header.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `orders_export_${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
@@ -231,19 +347,212 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-100">
       <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-          <button
-            onClick={handleLogout}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-          >
-            Logout
-          </button>
+        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+            >
+              Logout
+            </button>
+          </div>
+          {/* Top Sections Nav */}
+          <nav className="mt-4 -mb-px flex gap-6 text-sm">
+            <Link href="/admin" className="border-b-2 border-red-600 pb-2 text-gray-900">Overview</Link>
+            <Link href="/admin/today" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Today</Link>
+            <Link href="/admin/orders" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Orders</Link>
+            <Link href="/admin/items" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Items</Link>
+            <Link href="/admin/customers" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Customers</Link>
+            <Link href="/admin/revenue" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Revenue</Link>
+          </nav>
         </div>
       </header>
       <main>
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
+            {/* Top Metrics Bar */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs uppercase text-gray-500">Orders</p>
+                <p className="mt-2 text-2xl font-semibold">{metrics.totalOrders}</p>
+                <p className="text-xs text-gray-500">Avg £{metrics.avgOrderValue.toFixed(2)}</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs uppercase text-gray-500">Revenue</p>
+                <p className="mt-2 text-2xl font-semibold">£{metrics.totalRevenue.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">Completed £{metrics.completedRevenue.toFixed(2)}</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs uppercase text-gray-500">Most Ordered</p>
+                {metrics.topItems[0] ? (
+                  <div className="mt-2">
+                    <p className="text-base font-medium truncate">{metrics.topItems[0].name}</p>
+                    <p className="text-xs text-gray-500">Qty {metrics.topItems[0].qty} · £{metrics.topItems[0].revenue.toFixed(2)}</p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-sm text-gray-500">No data</p>
+                )}
+              </div>
+            </div>
+            {/* Filters */}
+            <div className="mb-6 flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Range:</span>
+                <div className="flex overflow-hidden rounded-md border">
+                  {(['today','7d','30d','all'] as const).map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setDateRange(r)}
+                      className={`px-3 py-1.5 text-sm ${dateRange===r? 'bg-red-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      {r === 'today' ? 'Today' : r === '7d' ? '7d' : r === '30d' ? '30d' : 'All'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Status:</span>
+                <select
+                  className="border rounded-md px-2 py-1 text-sm"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                >
+                  <option value="all">All</option>
+                  <option value="pending">Pending</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="preparing">Preparing</option>
+                  <option value="ready">Ready</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div className="ml-auto flex items-center gap-2">
+                <button onClick={exportCSV} className="px-3 py-1.5 rounded-md text-sm bg-gray-800 text-white hover:bg-gray-900">Export CSV</button>
+                <button onClick={fetchOrders} className="px-3 py-1.5 rounded-md text-sm bg-gray-100 hover:bg-gray-200">Refresh</button>
+              </div>
+            </div>
+
+            {/* KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs uppercase text-gray-500">Total Revenue</p>
+                <p className="mt-2 text-2xl font-semibold">£{metrics.totalRevenue.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">Range: {dateRange.toUpperCase()}</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs uppercase text-gray-500">Completed Revenue</p>
+                <p className="mt-2 text-2xl font-semibold">£{metrics.completedRevenue.toFixed(2)}</p>
+                <p className="text-xs text-gray-500">Only completed orders</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs uppercase text-gray-500">Orders</p>
+                <p className="mt-2 text-2xl font-semibold">{metrics.totalOrders}</p>
+                <p className="text-xs text-gray-500">Avg £{metrics.avgOrderValue.toFixed(2)}</p>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-xs uppercase text-gray-500">Status</p>
+                <div className="mt-2 space-y-1">
+                  {(['pending','accepted','preparing','ready','completed','cancelled'] as const).map(s => (
+                    <div key={s} className="flex justify-between text-xs text-gray-600">
+                      <span className="capitalize">{s}</span>
+                      <span>{metrics.counts[s]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              <div className="lg:col-span-2 bg-white rounded-lg shadow p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Revenue over time</p>
+                  <p className="text-xs text-gray-500">Last {dateRange==='today'? 'day' : dateRange==='7d'?'7 days': dateRange==='30d'?'30 days':'period'}</p>
+                </div>
+                {/* SVG Line/Area Chart */}
+                <div className="relative h-52">
+                  {(() => {
+                    const data = metrics.revenueSeries;
+                    const width = 800;
+                    const height = 200;
+                    const padding = { top: 10, right: 10, bottom: 24, left: 36 };
+                    const innerW = width - padding.left - padding.right;
+                    const innerH = height - padding.top - padding.bottom;
+                    const maxY = Math.max(1, ...data.map(d => d.value));
+                    const x = (i: number) => (i / Math.max(1, data.length - 1)) * innerW;
+                    const y = (v: number) => innerH - (v / maxY) * innerH;
+
+                    const path = data.map((d, i) => `${i===0? 'M':'L'} ${x(i)} ${y(d.value)}`).join(' ');
+                    const area = `M 0 ${innerH} ` + data.map((d, i) => `L ${x(i)} ${y(d.value)}`).join(' ') + ` L ${innerW} ${innerH} Z`;
+                    const gridY = [0, 0.25, 0.5, 0.75, 1].map(fr => ({ y: y(maxY * fr), v: maxY * fr }));
+
+                    return (
+                      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full">
+                        <g transform={`translate(${padding.left},${padding.top})`}>
+                          {/* Gridlines */}
+                          {gridY.map((g, idx) => (
+                            <line key={idx} x1={0} x2={innerW} y1={g.y} y2={g.y} stroke="#e5e7eb" strokeWidth={1} />
+                          ))}
+                          {/* Area */}
+                          <path d={area} fill="rgba(239,68,68,0.15)" />
+                          {/* Line */}
+                          <path d={path} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+                          {/* Points for hover */}
+                          {data.map((d, i) => (
+                            <g key={i}
+                               onMouseEnter={() => setHoverIdx(i)}
+                               onMouseLeave={() => setHoverIdx(null)}>
+                              <circle cx={x(i)} cy={y(d.value)} r={hoverIdx===i?4:3} fill="#ef4444" />
+                            </g>
+                          ))}
+                          {/* X-axis labels */}
+                          {data.map((d, i) => (
+                            <text key={i} x={x(i)} y={innerH + 16} fontSize={10} textAnchor="middle" fill="#6b7280">
+                              {d.date.slice(5)}
+                            </text>
+                          ))}
+                          {/* Y-axis labels */}
+                          {gridY.map((g, idx) => (
+                            <text key={idx} x={-8} y={g.y} fontSize={10} textAnchor="end" dominantBaseline="middle" fill="#6b7280">
+                              £{(g.v).toFixed(0)}
+                            </text>
+                          ))}
+                        </g>
+                      </svg>
+                    );
+                  })()}
+                  {hoverIdx !== null && metrics.revenueSeries[hoverIdx] && (
+                    <div className="absolute -translate-x-1/2 -translate-y-full px-2 py-1 text-xs bg-white border rounded shadow"
+                         style={{ left: `calc(${(hoverIdx/(Math.max(1,metrics.revenueSeries.length-1)))*100}% + 36px)`, top: 0 }}>
+                      <div className="font-medium">{metrics.revenueSeries[hoverIdx].date}</div>
+                      <div>£{metrics.revenueSeries[hoverIdx].value.toFixed(2)}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow p-4">
+                <p className="text-sm font-medium mb-2">Status breakdown</p>
+                <div className="space-y-2">
+                  {(['pending','accepted','preparing','ready','completed','cancelled'] as const).map(s => {
+                    const total = metrics.totalOrders || 1;
+                    const percent = Math.round((metrics.counts[s] / total) * 100);
+                    return (
+                      <div key={s}>
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="capitalize text-gray-600">{s}</span>
+                          <span className="text-gray-500">{percent}%</span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded">
+                          <div className="h-2 bg-red-500 rounded" style={{ width: `${percent}%` }}></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
             {loading ? (
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
