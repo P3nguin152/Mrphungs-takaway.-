@@ -23,9 +23,11 @@ export default function Hero() {
           <p className="text-xl md:text-2xl text-white opacity-90 mb-8">
             Experience the finest flavors of traditional Chinese dishes, freshly prepared and delivered to your door.
           </p>
-          <Link href="/order" className="inline-block bg-white text-red-600 px-8 py-3 rounded-md font-medium text-lg hover:bg-gray-100 transition duration-300">
-            Order Now
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Link href="/order" className="inline-flex items-center justify-center bg-red-600 text-white px-10 py-4 rounded-lg font-bold text-xl hover:bg-red-700 transform hover:scale-105 transition-all duration-300 shadow-lg">
+              🥡 Order Now
+            </Link>
+          </div>
         </div>
       </div>
     </div>

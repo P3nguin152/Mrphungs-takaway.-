@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { startOfDay, subDays, format } from "date-fns";
 
 interface OrderItem {
@@ -92,26 +91,7 @@ export default function CustomersAnalyticsPage() {
   }, [filtered, range]);
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
-            <nav className="-mb-px flex gap-6 text-sm">
-              <Link href="/admin" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Overview</Link>
-              <Link href="/admin/today" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Today</Link>
-              <Link href="/admin/orders" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Orders</Link>
-              <Link href="/admin/items" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Items</Link>
-              <span className="border-b-2 border-red-600 pb-2 text-gray-900">Customers</span>
-              <Link href="/admin/revenue" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Revenue</Link>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      <main>
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
+    <>
             {/* Range selector */}
             <div className="mb-4 flex items-center gap-2">
               <span className="text-sm text-gray-600">Range:</span>
@@ -264,9 +244,6 @@ export default function CustomersAnalyticsPage() {
                 </table>
               </div>
             </div>
-          </div>
-        </div>
-      </main>
-    </div>
+    </>
   );
 }

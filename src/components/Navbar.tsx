@@ -29,8 +29,8 @@ export default function Navbar() {
               Contact
             </Link>
             <Link href="/order" 
-              className="bg-red-600 text-white px-4 py-2 rounded-md font-medium hover:bg-red-700 transition duration-300">
-              Order Now
+              className="bg-red-600 text-white px-6 py-2.5 rounded-lg font-bold text-lg hover:bg-red-700 transform hover:scale-105 transition-all duration-300 shadow-lg">
+              🥡 Order Now
             </Link>
           </div>
           
@@ -72,9 +72,9 @@ export default function Navbar() {
               Contact
             </Link>
             <Link href="/order" 
-              className="block px-3 py-2 rounded-md text-base font-medium bg-red-600 text-white hover:bg-red-700"
+              className="block px-3 py-2 rounded-lg text-base font-bold bg-red-600 text-white hover:bg-red-700"
               onClick={() => setIsMenuOpen(false)}>
-              Order Now
+              🥡 Order Now
             </Link>
           </div>
         </div>

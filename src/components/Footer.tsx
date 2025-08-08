@@ -18,11 +18,6 @@ export default function Footer() {
             <p className="mb-2">Leeds, LS9 0HL</p>
             <p className="mb-2">0113 248 3487</p>
             <div className="mt-4">
-              <img 
-                src="/hygein.png" 
-                alt="Food Hygiene Rating" 
-                className="h-32 w-auto"
-              />
             </div>
           </div>
           

@@ -345,34 +345,9 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-            <button
-              onClick={handleLogout}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
-              Logout
-            </button>
-          </div>
-          {/* Top Sections Nav */}
-          <nav className="mt-4 -mb-px flex gap-6 text-sm">
-            <Link href="/admin" className="border-b-2 border-red-600 pb-2 text-gray-900">Overview</Link>
-            <Link href="/admin/today" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Today</Link>
-            <Link href="/admin/orders" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Orders</Link>
-            <Link href="/admin/items" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Items</Link>
-            <Link href="/admin/customers" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Customers</Link>
-            <Link href="/admin/revenue" className="border-b-2 border-transparent hover:border-gray-300 pb-2 text-gray-600 hover:text-gray-900">Revenue</Link>
-          </nav>
-        </div>
-      </header>
-      <main>
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            {/* Top Metrics Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <>
+      {/* Top Metrics Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
               <div className="bg-white rounded-lg shadow p-4">
                 <p className="text-xs uppercase text-gray-500">Orders</p>
                 <p className="mt-2 text-2xl font-semibold">{metrics.totalOrders}</p>
@@ -712,9 +687,6 @@ export default function AdminDashboard() {
                 )}
               </div>
             )}
-          </div>
-        </div>
-      </main>
-    </div>
+    </>
   );
 }

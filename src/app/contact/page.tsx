@@ -68,7 +68,7 @@ export default function Contact() {
               <div className="space-y-2">
                 <div className={`flex justify-between items-center p-2 rounded-md ${new Date().getDay() === 1 ? 'bg-red-50 border-l-4 border-red-600' : ''}`}>
                   <span className={`font-medium ${new Date().getDay() === 1 ? 'text-red-700' : 'text-gray-700'}`}>Monday</span>
-                  <span className="text-gray-600">17:00 - 23:00</span>
+                  <span className="text-gray-600">Closed</span>
                 </div>
                 <div className={`flex justify-between items-center p-2 rounded-md ${new Date().getDay() === 2 ? 'bg-red-50 border-l-4 border-red-600' : ''}`}>
                   <span className={`font-medium ${new Date().getDay() === 2 ? 'text-red-700' : 'text-gray-700'}`}>Tuesday</span>
