@@ -458,7 +458,7 @@ export default function Order() {
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Place Your Order</h1>
           <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            Select your favorite dishes, add them to your cart, and complete your order with secure payment
+            Select your favorite dishes, add them to your cart, and place your order. We will contact you to confirm your order and provide you with a delivery time. You will need to pay on dilivery!
           </p>
         </div>
         

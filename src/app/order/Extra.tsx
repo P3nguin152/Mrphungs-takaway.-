@@ -81,7 +81,7 @@ const Extra: React.FC<ExtraProps> = ({ addToCart }) => {
                 <p className="text-xs text-gray-500 mt-1">{item.includes}</p>
               )}
               {!item.unavailable && (
-                <p className="text-red-600 font-medium mt-1">From £{item.price.toFixed(2)}</p>
+                <p className="text-red-600 font-medium mt-1">£{item.price.toFixed(2)}</p>
               )}
             </div>
             <button 

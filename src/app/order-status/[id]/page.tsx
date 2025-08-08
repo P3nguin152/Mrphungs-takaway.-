@@ -131,12 +131,12 @@ export default function OrderStatus() {
                   <p>{item.name} × {item.quantity}</p>
                   {item.description && <p className="text-sm text-gray-500">{item.description}</p>}
                 </div>
-                <p>${(item.price * item.quantity).toFixed(2)}</p>
+                <p>£{(item.price * item.quantity).toFixed(2)}</p>
               </div>
             ))}
             <div className="pt-2 border-t font-semibold flex justify-between">
               <span>Total</span>
-              <span>${order.total.toFixed(2)}</span>
+              <span>£{order.total.toFixed(2)}</span>
             </div>
           </div>
         </div>

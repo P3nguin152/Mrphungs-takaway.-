@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectMongoose } from '@/lib/mongoose';
 import { Order } from '@/models/Order';
 
 export async function GET(req: NextRequest) {
@@ -23,15 +23,18 @@ export async function GET(req: NextRequest) {
   // Set up MongoDB change stream
   const setupChangeStream = async () => {
     try {
-      await connectToDatabase();
+      await connectMongoose();
       
       // Create a change stream on the orders collection
       const changeStream = Order.watch([], { fullDocument: 'updateLookup' });
       
       changeStream.on('change', (change) => {
         if (change.operationType === 'insert' || change.operationType === 'update' || change.operationType === 'replace') {
+          // Normalize _id to string for client-side comparisons
+          const doc: any = change.fullDocument;
+          const normalized = doc && doc._id ? { ...doc, _id: String(doc._id) } : doc;
           // Send the updated order data to the client
-          sendEvent(change.fullDocument);
+          sendEvent(normalized);
         }
       });
 
