@@ -26,7 +26,6 @@ interface Order {
   status:
     | "pending"
     | "accepted"
-    | "preparing"
     | "ready"
     | "completed"
     | "cancelled";

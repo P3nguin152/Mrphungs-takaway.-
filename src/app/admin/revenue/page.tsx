@@ -19,7 +19,6 @@ interface Order {
   status:
     | "pending"
     | "accepted"
-    | "preparing"
     | "ready"
     | "completed"
     | "cancelled";
@@ -75,7 +74,6 @@ export default function RevenueAnalyticsPage() {
     const statusCounts = {
       pending: filtered.filter((o) => o.status === "pending").length,
       accepted: filtered.filter((o) => o.status === "accepted").length,
-      preparing: filtered.filter((o) => o.status === "preparing").length,
       ready: filtered.filter((o) => o.status === "ready").length,
       completed: filtered.filter((o) => o.status === "completed").length,
       cancelled: filtered.filter((o) => o.status === "cancelled").length,
@@ -213,7 +211,7 @@ export default function RevenueAnalyticsPage() {
               <div className="bg-white rounded-lg shadow p-4">
                 <p className="text-sm font-medium mb-2">Status breakdown</p>
                 <div className="space-y-2">
-                  {(["pending", "accepted", "preparing", "ready", "completed", "cancelled"] as const).map((s) => {
+                  {(["pending", "accepted", "ready", "completed", "cancelled"] as const).map((s) => {
                     const total = metrics.totalOrders || 1;
                     const percent = Math.round((metrics.statusCounts[s] / total) * 100);
                     return (

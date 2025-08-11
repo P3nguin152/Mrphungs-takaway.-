@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   formatDistanceToNow,
@@ -24,7 +23,7 @@ interface Order {
   customerName: string;
   phone: string;
   deliveryAddress: string;
-  status: 'pending' | 'accepted' | 'preparing' | 'ready' | 'completed' | 'cancelled';
+  status: 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled';
   total: number;
   items: OrderItem[];
   deliveryNotes?: string;
@@ -35,72 +34,53 @@ interface Order {
 export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [password, setPassword] = useState('');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('7d');
   const [statusFilter, setStatusFilter] = useState<'all' | Order['status']>('all');
-  const router = useRouter();
-
-  // In a real app, use proper authentication
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    // This is just for demo purposes - in production, use proper authentication
-    if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password === 'admin123') {
-      setIsAuthenticated(true);
-      localStorage.setItem('isAuthenticated', 'true');
-      fetchOrders();
-    } else {
-      alert('Incorrect password');
-    }
-  };
+  
 
   useEffect(() => {
-    // Check if already authenticated
-    const auth = localStorage.getItem('isAuthenticated');
-    if (auth === 'true') {
-      setIsAuthenticated(true);
-      fetchOrders();
+    // Fetch orders immediately on mount (AuthGate ensures only authed users reach here)
+    fetchOrders();
+    
+    // Set up Server-Sent Events connection
+    const eventSource = new EventSource('/api/orders/updates');
+    
+    eventSource.onmessage = (event) => {
+      const updatedOrder = JSON.parse(event.data);
       
-      // Set up Server-Sent Events connection
-      const eventSource = new EventSource('/api/orders/updates');
-      
-      eventSource.onmessage = (event) => {
-        const updatedOrder = JSON.parse(event.data);
+      // Update orders list
+      setOrders(prevOrders => {
+        const orderExists = prevOrders.some(order => order._id === updatedOrder._id);
         
-        // Update orders list
-        setOrders(prevOrders => {
-          const orderExists = prevOrders.some(order => order._id === updatedOrder._id);
-          
-          if (orderExists) {
-            // Update existing order
-            return prevOrders.map(order => 
-              order._id === updatedOrder._id 
-                ? { ...order, ...updatedOrder } 
-                : order
-            );
-          } else {
-            // Add new order to the beginning of the list
-            return [updatedOrder, ...prevOrders];
-          }
-        });
-        
-        // Update selected order if it's the one being viewed
-        if (selectedOrder?._id === updatedOrder._id) {
-          setSelectedOrder(prev => prev ? { ...prev, ...updatedOrder } : null);
+        if (orderExists) {
+          // Update existing order
+          return prevOrders.map(order => 
+            order._id === updatedOrder._id 
+              ? { ...order, ...updatedOrder } 
+              : order
+          );
+        } else {
+          // Add new order to the beginning of the list
+          return [updatedOrder, ...prevOrders];
         }
-      };
+      });
       
-      eventSource.onerror = (error) => {
-        console.error('EventSource failed:', error);
-        eventSource.close();
-      };
-      
-      // Clean up the event source when the component unmounts
-      return () => {
-        eventSource.close();
-      };
-    }
+      // Update selected order if it's the one being viewed
+      if (selectedOrder?._id === updatedOrder._id) {
+        setSelectedOrder(prev => prev ? { ...prev, ...updatedOrder } : null);
+      }
+    };
+    
+    eventSource.onerror = (error) => {
+      console.error('EventSource failed:', error);
+      eventSource.close();
+    };
+    
+    // Clean up the event source when the component unmounts
+    return () => {
+      eventSource.close();
+    };
   }, [selectedOrder?._id]);
 
   const fetchOrders = async () => {
@@ -145,7 +125,8 @@ export default function AdminDashboard() {
   const filtered = useMemo(() => {
     return orders.filter((o) => {
       const created = normalizeDate(o.createdAt) ?? normalizeDate(o.updatedAt);
-      const inRange = !rangeStart || (created && isAfter(created, subDays(rangeStart, 1)));
+      // Include orders created at or after the computed rangeStart (e.g., start of today for 'today')
+      const inRange = !rangeStart || (created && created.getTime() >= rangeStart.getTime());
       const statusOk = statusFilter === 'all' || o.status === statusFilter;
       return inRange && statusOk;
     });
@@ -154,14 +135,13 @@ export default function AdminDashboard() {
   // Metrics
   const metrics = useMemo(() => {
     const totalOrders = filtered.length;
-    const totalRevenue = filtered.reduce((sum, o) => sum + (o.total || 0), 0);
     const completed = filtered.filter((o) => o.status === 'completed');
-    const completedRevenue = completed.reduce((sum, o) => sum + (o.total || 0), 0);
+    // Make total revenue reflect completed revenue only
+    const totalRevenue = completed.reduce((sum, o) => sum + (o.total || 0), 0);
     const avgOrderValue = totalOrders ? totalRevenue / totalOrders : 0;
     const counts = {
       pending: filtered.filter(o => o.status === 'pending').length,
       accepted: filtered.filter(o => o.status === 'accepted').length,
-      preparing: filtered.filter(o => o.status === 'preparing').length,
       ready: filtered.filter(o => o.status === 'ready').length,
       completed: filtered.filter(o => o.status === 'completed').length,
       cancelled: filtered.filter(o => o.status === 'cancelled').length,
@@ -181,7 +161,10 @@ export default function AdminDashboard() {
       const created = normalizeDate(o.createdAt) ?? normalizeDate(o.updatedAt);
       if (!created) return;
       const key = format(startOfDay(created), 'yyyy-MM-dd');
-      if (byDay.has(key)) byDay.set(key, (byDay.get(key) || 0) + (o.total || 0));
+      // Only include completed orders in revenue series
+      if (byDay.has(key) && o.status === 'completed') {
+        byDay.set(key, (byDay.get(key) || 0) + (o.total || 0));
+      }
     });
     const revenueSeries = Array.from(byDay.entries()).map(([date, value]) => ({ date, value }));
 
@@ -199,7 +182,7 @@ export default function AdminDashboard() {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
 
-    return { totalOrders, totalRevenue, completedRevenue, avgOrderValue, counts, revenueSeries, topItems };
+    return { totalOrders, totalRevenue, avgOrderValue, counts, revenueSeries, topItems };
   }, [filtered, dateRange, rangeStart]);
 
   // Chart hover state
@@ -269,7 +252,6 @@ export default function AdminDashboard() {
     switch (status) {
       case 'pending': return { class: `${baseClasses} bg-yellow-100 text-yellow-800`, label: 'Pending' };
       case 'accepted': return { class: `${baseClasses} bg-blue-100 text-blue-800`, label: 'Accepted' };
-      case 'preparing': return { class: `${baseClasses} bg-indigo-100 text-indigo-800`, label: 'Preparing' };
       case 'ready': return { class: `${baseClasses} bg-green-100 text-green-800`, label: 'Ready' };
       case 'completed': return { class: `${baseClasses} bg-gray-100 text-gray-800`, label: 'Completed' };
       case 'cancelled': return { class: `${baseClasses} bg-red-100 text-red-800`, label: 'Cancelled' };
@@ -280,8 +262,7 @@ export default function AdminDashboard() {
   const getNextStatus = (currentStatus: Order['status']) => {
     switch (currentStatus) {
       case 'pending': return 'accepted';
-      case 'accepted': return 'preparing';
-      case 'preparing': return 'ready';
+      case 'accepted': return 'ready';
       case 'ready': return 'completed';
       default: return currentStatus;
     }
@@ -296,80 +277,12 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    setIsAuthenticated(false);
-    setPassword('');
-  };
+  // Login is handled on /admin/login. Logout handled by header LogoutButton.
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
-        <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow">
-          <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-              Admin Sign In
-            </h2>
-          </div>
-          <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-            <div className="rounded-md shadow-sm -space-y-px">
-              <div>
-                <label htmlFor="password" className="sr-only">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500 focus:z-10 sm:text-sm"
-                  placeholder="Enter admin password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                Sign in
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  // Always render dashboard; layout guards unauthenticated access.
 
   return (
     <>
-      {/* Top Metrics Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              <div className="bg-white rounded-lg shadow p-4">
-                <p className="text-xs uppercase text-gray-500">Orders</p>
-                <p className="mt-2 text-2xl font-semibold">{metrics.totalOrders}</p>
-                <p className="text-xs text-gray-500">Avg £{metrics.avgOrderValue.toFixed(2)}</p>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4">
-                <p className="text-xs uppercase text-gray-500">Revenue</p>
-                <p className="mt-2 text-2xl font-semibold">£{metrics.totalRevenue.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Completed £{metrics.completedRevenue.toFixed(2)}</p>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4">
-                <p className="text-xs uppercase text-gray-500">Most Ordered</p>
-                {metrics.topItems[0] ? (
-                  <div className="mt-2">
-                    <p className="text-base font-medium truncate">{metrics.topItems[0].name}</p>
-                    <p className="text-xs text-gray-500">Qty {metrics.topItems[0].qty} · £{metrics.topItems[0].revenue.toFixed(2)}</p>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-sm text-gray-500">No data</p>
-                )}
-              </div>
-            </div>
             {/* Filters */}
             <div className="mb-6 flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
@@ -396,7 +309,7 @@ export default function AdminDashboard() {
                   <option value="all">All</option>
                   <option value="pending">Pending</option>
                   <option value="accepted">Accepted</option>
-                  <option value="preparing">Preparing</option>
+                  
                   <option value="ready">Ready</option>
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>
@@ -408,125 +321,6 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* KPIs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white rounded-lg shadow p-4">
-                <p className="text-xs uppercase text-gray-500">Total Revenue</p>
-                <p className="mt-2 text-2xl font-semibold">£{metrics.totalRevenue.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Range: {dateRange.toUpperCase()}</p>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4">
-                <p className="text-xs uppercase text-gray-500">Completed Revenue</p>
-                <p className="mt-2 text-2xl font-semibold">£{metrics.completedRevenue.toFixed(2)}</p>
-                <p className="text-xs text-gray-500">Only completed orders</p>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4">
-                <p className="text-xs uppercase text-gray-500">Orders</p>
-                <p className="mt-2 text-2xl font-semibold">{metrics.totalOrders}</p>
-                <p className="text-xs text-gray-500">Avg £{metrics.avgOrderValue.toFixed(2)}</p>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4">
-                <p className="text-xs uppercase text-gray-500">Status</p>
-                <div className="mt-2 space-y-1">
-                  {(['pending','accepted','preparing','ready','completed','cancelled'] as const).map(s => (
-                    <div key={s} className="flex justify-between text-xs text-gray-600">
-                      <span className="capitalize">{s}</span>
-                      <span>{metrics.counts[s]}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-              <div className="lg:col-span-2 bg-white rounded-lg shadow p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium">Revenue over time</p>
-                  <p className="text-xs text-gray-500">Last {dateRange==='today'? 'day' : dateRange==='7d'?'7 days': dateRange==='30d'?'30 days':'period'}</p>
-                </div>
-                {/* SVG Line/Area Chart */}
-                <div className="relative h-52">
-                  {(() => {
-                    const data = metrics.revenueSeries;
-                    const width = 800;
-                    const height = 200;
-                    const padding = { top: 10, right: 10, bottom: 24, left: 36 };
-                    const innerW = width - padding.left - padding.right;
-                    const innerH = height - padding.top - padding.bottom;
-                    const maxY = Math.max(1, ...data.map(d => d.value));
-                    const x = (i: number) => (i / Math.max(1, data.length - 1)) * innerW;
-                    const y = (v: number) => innerH - (v / maxY) * innerH;
-
-                    const path = data.map((d, i) => `${i===0? 'M':'L'} ${x(i)} ${y(d.value)}`).join(' ');
-                    const area = `M 0 ${innerH} ` + data.map((d, i) => `L ${x(i)} ${y(d.value)}`).join(' ') + ` L ${innerW} ${innerH} Z`;
-                    const gridY = [0, 0.25, 0.5, 0.75, 1].map(fr => ({ y: y(maxY * fr), v: maxY * fr }));
-
-                    return (
-                      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full">
-                        <g transform={`translate(${padding.left},${padding.top})`}>
-                          {/* Gridlines */}
-                          {gridY.map((g, idx) => (
-                            <line key={idx} x1={0} x2={innerW} y1={g.y} y2={g.y} stroke="#e5e7eb" strokeWidth={1} />
-                          ))}
-                          {/* Area */}
-                          <path d={area} fill="rgba(239,68,68,0.15)" />
-                          {/* Line */}
-                          <path d={path} fill="none" stroke="#ef4444" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-                          {/* Points for hover */}
-                          {data.map((d, i) => (
-                            <g key={i}
-                               onMouseEnter={() => setHoverIdx(i)}
-                               onMouseLeave={() => setHoverIdx(null)}>
-                              <circle cx={x(i)} cy={y(d.value)} r={hoverIdx===i?4:3} fill="#ef4444" />
-                            </g>
-                          ))}
-                          {/* X-axis labels */}
-                          {data.map((d, i) => (
-                            <text key={i} x={x(i)} y={innerH + 16} fontSize={10} textAnchor="middle" fill="#6b7280">
-                              {d.date.slice(5)}
-                            </text>
-                          ))}
-                          {/* Y-axis labels */}
-                          {gridY.map((g, idx) => (
-                            <text key={idx} x={-8} y={g.y} fontSize={10} textAnchor="end" dominantBaseline="middle" fill="#6b7280">
-                              £{(g.v).toFixed(0)}
-                            </text>
-                          ))}
-                        </g>
-                      </svg>
-                    );
-                  })()}
-                  {hoverIdx !== null && metrics.revenueSeries[hoverIdx] && (
-                    <div className="absolute -translate-x-1/2 -translate-y-full px-2 py-1 text-xs bg-white border rounded shadow"
-                         style={{ left: `calc(${(hoverIdx/(Math.max(1,metrics.revenueSeries.length-1)))*100}% + 36px)`, top: 0 }}>
-                      <div className="font-medium">{metrics.revenueSeries[hoverIdx].date}</div>
-                      <div>£{metrics.revenueSeries[hoverIdx].value.toFixed(2)}</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow p-4">
-                <p className="text-sm font-medium mb-2">Status breakdown</p>
-                <div className="space-y-2">
-                  {(['pending','accepted','preparing','ready','completed','cancelled'] as const).map(s => {
-                    const total = metrics.totalOrders || 1;
-                    const percent = Math.round((metrics.counts[s] / total) * 100);
-                    return (
-                      <div key={s}>
-                        <div className="flex justify-between text-xs mb-1">
-                          <span className="capitalize text-gray-600">{s}</span>
-                          <span className="text-gray-500">{percent}%</span>
-                        </div>
-                        <div className="h-2 bg-gray-100 rounded">
-                          <div className="h-2 bg-red-500 rounded" style={{ width: `${percent}%` }}></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
 
             {loading ? (
               <div className="text-center py-12">
@@ -542,12 +336,12 @@ export default function AdminDashboard() {
                       <h3 className="text-lg leading-6 font-medium text-gray-900">Orders</h3>
                     </div>
                     <ul className="divide-y divide-gray-200 max-h-[calc(100vh-200px)] overflow-y-auto">
-                      {orders.length === 0 ? (
+                      {filtered.length === 0 ? (
                         <li className="px-6 py-4 text-center text-gray-500">
                           No orders found
                         </li>
                       ) : (
-                        orders.map((order, index) => (
+                        filtered.map((order, index) => (
                           <li 
                             key={order._id || `order-${index}`}
                             className={`px-4 py-4 hover:bg-gray-50 cursor-pointer ${selectedOrder?._id === order._id ? 'bg-blue-50' : ''}`}

@@ -16,7 +16,7 @@ interface Order {
   customerName: string;
   phone: string;
   deliveryAddress: string;
-  status: "pending" | "accepted" | "preparing" | "ready" | "completed" | "cancelled";
+  status: "pending" | "accepted" | "ready" | "completed" | "cancelled";
   total: number;
   items: OrderItem[];
   deliveryNotes?: string;
@@ -27,7 +27,7 @@ interface Order {
 export default function OrdersAnalyticsPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState<"7d" | "30d" | "all">("7d");
+  const [range, setRange] = useState<"1d" | "7d" | "30d" | "all">("7d");
   const [status, setStatus] = useState<"all" | Order["status"]>("all");
   const [selected, setSelected] = useState<Order | null>(null);
 
@@ -50,7 +50,7 @@ export default function OrdersAnalyticsPage() {
   const filtered = useMemo(() => {
     let result = orders;
     if (range !== "all") {
-      const days = range === "7d" ? 7 : 30;
+      const days = range === "1d" ? 1 : range === "7d" ? 7 : 30;
       const start = startOfDay(subDays(new Date(), days - 1));
       result = result.filter((o) => new Date(o.createdAt || o.updatedAt) >= start);
     }
@@ -92,7 +92,7 @@ export default function OrdersAnalyticsPage() {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600">Range:</span>
                 <div className="flex overflow-hidden rounded-md border">
-                  {(["7d", "30d", "all"] as const).map((r) => (
+                  {(["1d", "7d", "30d", "all"] as const).map((r) => (
                     <button key={r} onClick={() => setRange(r)} className={`px-3 py-1.5 text-sm ${range === r ? "bg-red-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}>{r}</button>
                   ))}
                 </div>
@@ -103,7 +103,6 @@ export default function OrdersAnalyticsPage() {
                   <option value="all">All</option>
                   <option value="pending">Pending</option>
                   <option value="accepted">Accepted</option>
-                  <option value="preparing">Preparing</option>
                   <option value="ready">Ready</option>
                   <option value="completed">Completed</option>
                   <option value="cancelled">Cancelled</option>

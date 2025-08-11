@@ -576,186 +576,83 @@ export default function Order() {
           </div>
         </div>
         
-        {/* Checkout Modal */}
+        {/* Checkout Fullscreen */}
         {isCheckingOut && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Checkout</h2>
-                <button 
-                  onClick={() => setIsCheckingOut(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+          <div className="fixed inset-0 z-50 flex flex-col bg-white">
+            {/* Header */}
+            <div className="sticky top-0 z-50 border-b bg-white">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setIsCheckingOut(false)} aria-label="Back" className="w-10 h-10 rounded-full border border-gray-200 text-gray-600 hover:text-gray-900 hover:border-gray-300 inline-flex items-center justify-center">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                  </button>
+                  <h2 className="text-base font-semibold">Secure Checkout</h2>
+                </div>
+                <div className="hidden sm:flex items-center gap-4">
+                  <div className="text-gray-900 font-semibold">£{totalPrice.toFixed(2)}</div>
+                  <button onClick={handleCheckout} disabled={isSubmitting} className={`px-4 py-2 rounded-md text-white font-medium ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}>{isSubmitting ? 'Processing…' : 'Place Order'}</button>
+                </div>
               </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Column - Delivery Information */}
-                <div className="lg:col-span-2">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-800">Delivery Information</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="name">
-                        Full Name *
-                      </label>
-                      <input
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        id="name"
-                        name="name"
-                        type="text"
-                        placeholder="John Doe"
-                        value={customerDetails.name}
-                        onChange={handleInputChange}
-                        required
-                      />
+            </div>
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Details */}
+                <div className="lg:col-span-2 bg-white rounded-xl shadow-sm ring-1 ring-gray-100 p-6">
+                  <h3 className="text-lg font-semibold mb-4 text-gray-900">Delivery details</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="name">Full Name *</label>
+                      <input id="name" name="name" type="text" placeholder="John Doe" value={customerDetails.name} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500" />
                     </div>
-                    
                     <div>
-                      <div>
-                        <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="phone">
-                          Phone *
-                        </label>
-                        <input
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          id="phone"
-                          name="phone"
-                          type="tel"
-                          placeholder="07123456789"
-                          value={customerDetails.phone}
-                          onChange={handleInputChange}
-                          required
-                        />
-                      </div>
+                      <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="phone">Phone *</label>
+                      <input id="phone" name="phone" type="tel" placeholder="07123456789" value={customerDetails.phone} onChange={handleInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500" />
                     </div>
-                    
                     <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="address">
-                        Delivery Address *
-                      </label>
-                      <input
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        id="address"
-                        name="address"
-                        type="text"
-                        placeholder="123 Main Street"
-                        value={customerDetails.address}
-                        onChange={handleAddressInputChange}
-                        required
-                      />
+                      <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="postcode">Postcode *</label>
+                      <input id="postcode" name="postcode" type="text" placeholder="LS9 0HL" value={customerDetails.postcode} onChange={handlePostcodeInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500" />
                     </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="postcode">
-                          Postcode *
-                        </label>
-                        <input
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          id="postcode"
-                          name="postcode"
-                          type="text"
-                          placeholder="LS9 0HL"
-                          value={customerDetails.postcode}
-                          onChange={handlePostcodeInputChange}
-                          required
-                        />
-                      </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="address">Delivery Address *</label>
+                      <input id="address" name="address" type="text" placeholder="123 Main Street" value={customerDetails.address} onChange={handleAddressInputChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500" />
                     </div>
-                    
-                    <div>
-                      <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="deliveryNotes">
-                        Delivery Notes (Optional)
-                      </label>
-                      <textarea
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        id="deliveryNotes"
-                        name="deliveryNotes"
-                        placeholder="Any special instructions for delivery..."
-                        value={customerDetails.deliveryNotes}
-                        onChange={handleInputChange}
-                        rows={3}
-                      />
+                    <div className="sm:col-span-2">
+                      <label className="block text-gray-700 text-sm font-medium mb-1" htmlFor="deliveryNotes">Delivery Notes (Optional)</label>
+                      <textarea id="deliveryNotes" name="deliveryNotes" rows={3} placeholder="Any special instructions for delivery..." value={customerDetails.deliveryNotes} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500" />
                     </div>
                   </div>
-                  
-                  {/* Order Summary - Moved to bottom left */}
-                  <div className="mt-6 bg-gray-50 p-4 rounded-md">
-                    <h4 className="font-medium text-gray-900 mb-2">Order Summary</h4>
-                    <div className="space-y-2">
+                </div>
+                {/* Summary */}
+                <div className="lg:col-span-1">
+                  <div className="bg-white rounded-xl shadow-sm ring-1 ring-gray-100 p-6 lg:sticky lg:top-24">
+                    <h3 className="text-lg font-semibold mb-4 text-gray-900">Your Order</h3>
+                    <div className="space-y-2 max-h-[40vh] overflow-auto pr-1">
                       {cart.map((item) => (
                         <div key={item.id} className="flex justify-between text-sm">
-                          <span className="text-gray-700">
-                            {item.quantity} × {item.name}
-                          </span>
+                          <span className="text-gray-700">{item.quantity} × {item.name}</span>
                           <span className="font-medium">£{(item.price * item.quantity).toFixed(2)}</span>
                         </div>
                       ))}
                       <div className="border-t border-gray-200 my-2"></div>
-                      <div className="flex justify-between pt-2 border-t border-gray-200 font-medium">
+                      <div className="flex justify-between pt-2 font-semibold text-gray-900">
                         <span>Total</span>
                         <span>£{totalPrice.toFixed(2)}</span>
                       </div>
-                      
-                      <button
-                        onClick={handleCheckout}
-                        disabled={isSubmitting}
-                        className={`w-full mt-6 py-3 px-4 rounded-md font-medium text-white transition duration-300 ${
-                          isSubmitting
-                            ? 'bg-blue-400 cursor-not-allowed'
-                            : 'bg-green-600 hover:bg-green-700'
-                        }`}
-                      >
-                        {isSubmitting ? (
-                          <span className="flex items-center justify-center">
-                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Placing Order...
-                          </span>
-                        ) : (
-                          'Place Order'
-                        )}
-                      </button>
+                      <button onClick={handleCheckout} disabled={isSubmitting} className={`w-full mt-4 py-3 rounded-md text-white font-medium ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}>{isSubmitting ? 'Placing Order…' : 'Place Order'}</button>
                     </div>
-                  </div>
-                  
-                  <div className="text-xs text-gray-500 mt-4">
-                    <p>By placing your order, you agree to our Terms of Service and Privacy Policy.</p>
-                    <p className="mt-1">Orders may not be accepted if there are too many orders or is outside the dilivery radius.</p>
-                  </div>
-                </div>
-                
-                {/* Right Column - Extras */}
-                <div className="lg:col-span-1">
-                  <h3 className="text-lg font-semibold mb-4 text-gray-800">Add Extras</h3>
-                  <div className="space-y-3">
-                    {extrasItems.map((extra) => (
-                      <div key={extra.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
-                        <div>
-                          <p className="font-medium text-sm">{extra.name}</p>
-                          <p className="text-sm text-gray-600">£{extra.price.toFixed(2)}</p>
-                        </div>
-                        <button
-                          onClick={() => addToCart(extra.id, { price: extra.price })}
-                          className="bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700 transition-colors"
-                          aria-label={`Add ${extra.name} to order`}
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
                   </div>
                 </div>
               </div>
             </div>
+            {/* Mobile bottom bar */}
+            <div className="sm:hidden sticky bottom-0 w-full border-t bg-white p-3 flex items-center justify-between z-50">
+              <div className="font-semibold">£{totalPrice.toFixed(2)}</div>
+              <button onClick={handleCheckout} disabled={isSubmitting} className={`px-4 py-2 rounded-md text-white font-medium ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600'}`}>{isSubmitting ? 'Processing…' : 'Place Order'}</button>
+            </div>
           </div>
         )}
+        
       </div>
     </div>
   );

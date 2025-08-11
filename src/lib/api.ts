@@ -17,7 +17,7 @@ export interface OrderData {
 
 export interface Order extends OrderData {
   _id: string;
-  status: 'pending' | 'accepted' | 'preparing' | 'ready' | 'completed' | 'cancelled';
+  status: 'pending' | 'accepted' | 'ready' | 'completed' | 'cancelled';
   createdAt: string;
   updatedAt: string;
 }

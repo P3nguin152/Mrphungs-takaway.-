@@ -16,7 +16,7 @@ interface Order {
   customerName: string;
   phone: string;
   deliveryAddress: string;
-  status: "pending" | "accepted" | "preparing" | "ready" | "completed" | "cancelled";
+  status: "pending" | "accepted" | "ready" | "completed" | "cancelled";
   total: number;
   items: OrderItem[];
   deliveryNotes?: string;

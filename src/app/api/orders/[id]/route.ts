@@ -31,14 +31,15 @@ export async function PATCH(
   try {
     await connectMongoose();
     const { status } = await request.json();
+    const { id } = await Promise.resolve(params);
 
-    const validStatuses = ['pending', 'accepted', 'preparing', 'ready', 'completed', 'cancelled'] as const;
+    const validStatuses = ['pending', 'accepted', 'ready', 'completed', 'cancelled'] as const;
     if (!validStatuses.includes(status)) {
       return NextResponse.json({ error: `Invalid status: ${status}` }, { status: 400 });
     }
 
     const updated = await Order.findByIdAndUpdate(
-      params.id,
+      id,
       { status },
       { new: true }
     ).lean();
